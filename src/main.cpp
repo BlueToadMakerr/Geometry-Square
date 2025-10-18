@@ -61,7 +61,6 @@ class $modify(RandomColorSprite, CCSprite) {
 // NEW: Hook setTexture to catch dynamic sprites
 void setTexture(CCTexture2D* texture) {
     if (texture) {
-        // Generate random color if not stored
         if (g_textureColors.find(texture) == g_textureColors.end()) {
             g_textureColors[texture] = {
                 (GLubyte)dist(rng),
@@ -72,32 +71,34 @@ void setTexture(CCTexture2D* texture) {
         }
         auto color = g_textureColors[texture];
 
-        // Check if this sprite is a GameObject (by RTTI name)
+        // Check if this sprite is a GameObject
         std::string typeName = typeid(*this).name();
         bool isGameObject = typeName.find("GameObject") != std::string::npos;
 
         if (isGameObject) {
-            // Don’t recolor the texture — instead draw an overlay
-            if (!this->getChildByTag(8888)) {
+            // Find PlayLayer to safely add overlay there instead of crashing
+            auto playLayer = CCDirector::sharedDirector()
+                                 ->getRunningScene()
+                                 ->getChildByType<PlayLayer>(0);
+
+            if (playLayer && !this->getUserObject()) {
                 auto overlay = CCLayerColor::create(
-                    ccc4(color.r, color.g, color.b, 200),
-                    this->getContentSize().width,
-                    this->getContentSize().height
+                    ccc4(color.r, color.g, color.b, 120),
+                    this->getContentSize().width * this->getScaleX(),
+                    this->getContentSize().height * this->getScaleY()
                 );
-                overlay->setTag(8888);
-                overlay->setAnchorPoint({0.5f, 0.5f});
-                overlay->ignoreAnchorPointForPosition(false);
-                overlay->setPosition(this->getContentSize().width / 2, this->getContentSize().height / 2);
-                overlay->setScaleX(this->getScaleX());
-                overlay->setScaleY(this->getScaleY());
-                overlay->setRotation(this->getRotation());
+                overlay->setPosition(this->convertToWorldSpace(
+                    {0, 0})); // position over the object
                 overlay->setZOrder(9999);
-                this->addChild(overlay);
+
+                // tag this so we don’t duplicate overlays
+                this->setUserObject(overlay);
+                playLayer->addChild(overlay);
             }
-            return; // don’t change texture for GameObjects
+            return; // don’t recolor texture
         }
 
-        // For everything else (UI, menus, etc.), still recolor
+        // For everything else (UI, menus, etc.)
         CCSprite::setTexture(makeSolidColor(color.r, color.g, color.b));
     } else {
         CCSprite::setTexture(nullptr);
