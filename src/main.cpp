@@ -60,14 +60,27 @@ class $modify(RandomColorSprite, CCSprite) {
 
     // NEW: Hook setTexture to catch dynamic sprites, preserving original info
     void setTexture(CCTexture2D* texture) {
+        // Always call the original first
         CCSprite::setTexture(texture); // keep original texture info
 
-        if (texture) {
-            if (g_textureColors.find(texture) == g_textureColors.end()) {
-                g_textureColors[texture] = { (GLubyte)dist(rng), (GLubyte)dist(rng), (GLubyte)dist(rng), 255 };
+        // Attempt to tint the sprite
+        try {
+            if (texture) {
+                // Generate a random color for this texture if not already done
+                if (g_textureColors.find(texture) == g_textureColors.end()) {
+                    g_textureColors[texture] = {
+                        (GLubyte)dist(rng),
+                        (GLubyte)dist(rng),
+                        (GLubyte)dist(rng),
+                    255
+                        };
+                    }
+                    auto color = g_textureColors[texture];
+                this->setColor(ccc3(color.r, color.g, color.b)); // tint instead of replacing
             }
-            auto color = g_textureColors[texture];
-            this->setColor(ccc3(color.r, color.g, color.b)); // tint instead of replacing
+        } catch (...) {
+            // If anything goes wrong (e.g., sprite destroyed mid-update), just skip it
+            log::warn("RandomColorSprite: failed to set color on sprite, skipping safely.");
         }
     }
 };
