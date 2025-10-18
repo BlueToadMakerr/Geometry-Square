@@ -57,6 +57,19 @@ class $modify(RandomColorSprite, CCSprite) {
 
         return true;
     }
+
+    // NEW: Hook setTexture to catch dynamic sprites
+    void setTexture(CCTexture2D* texture) {
+        if (texture) {
+            if (g_textureColors.find(texture) == g_textureColors.end()) {
+                g_textureColors[texture] = { (GLubyte)dist(rng), (GLubyte)dist(rng), (GLubyte)dist(rng), 255 };
+            }
+            auto color = g_textureColors[texture];
+            CCSprite::setTexture(makeSolidColor(color.r, color.g, color.b));
+        } else {
+            CCSprite::setTexture(nullptr);
+        }
+    }
 };
 
 $execute {
