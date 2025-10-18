@@ -1,6 +1,5 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCTextureCache.hpp>
-#include <Geode/modify/CCTexture2D.hpp>
 #include <cocos2d.h>
 
 using namespace geode::prelude;
@@ -12,11 +11,9 @@ public:
         auto original = CCTextureCache::addImage(path, async);
         if (!original) return nullptr;
 
-        // Get size
         auto width = original->getPixelsWide();
         auto height = original->getPixelsHigh();
 
-        // Create a render texture to read pixel data
         auto rt = CCRenderTexture::create(width, height);
         if (!rt) return original;
 
@@ -28,7 +25,6 @@ public:
         rt->end();
         rt->retain();
 
-        // Get pixel data
         auto image = rt->newCCImage();
         auto data = image->getData();
         int dataLen = image->getDataLen();
@@ -38,7 +34,6 @@ public:
             return original;
         }
 
-        // Compute average color
         long long rSum = 0, gSum = 0, bSum = 0, count = 0;
         for (int i = 0; i < dataLen; i += 4) {
             rSum += data[i];
@@ -46,6 +41,7 @@ public:
             bSum += data[i + 2];
             count++;
         }
+
         unsigned char avgR = rSum / count;
         unsigned char avgG = gSum / count;
         unsigned char avgB = bSum / count;
@@ -53,10 +49,11 @@ public:
         image->release();
         rt->release();
 
-        // Create 1x1 texture of that color
+        // Instead of initWithRawData (not available), we use initWithImageData
         unsigned char pixel[4] = {avgR, avgG, avgB, 255};
+
         auto solid = new CCImage();
-        solid->initWithRawData(pixel, sizeof(pixel), kFmtRawData, 1, 1, 8);
+        solid->initWithImageData(pixel, sizeof(pixel), CCImage::kFmtRawData, 1, 1, 8);
 
         auto solidTex = new CCTexture2D();
         solidTex->initWithImage(solid);
