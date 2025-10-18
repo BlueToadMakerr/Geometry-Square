@@ -1,7 +1,5 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCSprite.hpp>
-#include <Geode/modify/CCSpriteFrameCache.hpp>
-#include <Geode/modify/CCTextureCache.hpp>
 #include <cocos2d.h>
 #include <unordered_map>
 #include <random>
@@ -27,7 +25,7 @@ static CCTexture2D* makeSolidColor(unsigned char r, unsigned char g, unsigned ch
     return tex;
 }
 
-// Hook all CCSprites
+// Hook all sprites
 class $modify(RandomColorSprite, CCSprite) {
     bool initWithSpriteFrame(CCSpriteFrame* frame) {
         if (!CCSprite::initWithSpriteFrame(frame))
@@ -61,66 +59,6 @@ class $modify(RandomColorSprite, CCSprite) {
     }
 };
 
-// Hook CCSpriteFrameCache for all sprite sheets
-class $modify(RandomColorSpriteFrameCache, CCSpriteFrameCache) {
-    using CCSpriteFrameCache::addSpriteFramesWithFile;
-
-    void addSpriteFramesWithFile(const char* plist, const char* texture_filename) {
-        CCSpriteFrameCache::addSpriteFramesWithFile(plist, texture_filename);
-
-        auto dict = CCDictionary::createWithContentsOfFile(plist);
-        if (!dict) return;
-        auto frames_dict = static_cast<CCDictionary*>(dict->objectForKey("frames"));
-        if (!frames_dict) return;
-
-        CCDictElement* element = nullptr;
-        CCDICT_FOREACH(frames_dict, element) {
-            const char* frame_name = element->getStrKey();
-            auto frame = this->spriteFrameByName(frame_name);
-            if (!frame) continue;
-
-            auto orig_tex = frame->getTexture();
-            if (g_textureColors.find(orig_tex) == g_textureColors.end()) {
-                g_textureColors[orig_tex] = { (GLubyte)dist(rng), (GLubyte)dist(rng), (GLubyte)dist(rng), 255 };
-            }
-            auto color = g_textureColors[orig_tex];
-            auto new_tex = makeSolidColor(color.r, color.g, color.b);
-
-            auto rect = frame->getRect();
-            auto offset = frame->getOffset();
-            auto orig_size = frame->getOriginalSize();
-
-            auto new_frame = CCSpriteFrame::createWithTexture(new_tex, rect);
-            new_frame->setOffset(offset);
-            new_frame->setOriginalSize(orig_size);
-            new_frame->setRect(rect);
-
-            this->removeSpriteFrameByName(frame_name);
-            this->addSpriteFrame(new_frame, frame_name);
-        }
-    }
-
-    void addSpriteFramesWithFile(const char* plist) {
-        addSpriteFramesWithFile(plist, (const char*)nullptr);
-    }
-};
-
-// Hook CCTextureCache to replace any dynamically loaded texture
-class $modify(RandomColorTextureCache, CCTextureCache) {
-    using CCTextureCache::addImage;
-
-    CCTexture2D* addImage(const char* path, bool p1) {
-        auto orig = CCTextureCache::addImage(path, p1);
-        if (!orig) return orig;
-
-        if (g_textureColors.find(orig) == g_textureColors.end()) {
-            g_textureColors[orig] = { (GLubyte)dist(rng), (GLubyte)dist(rng), (GLubyte)dist(rng), 255 };
-        }
-        auto color = g_textureColors[orig];
-        return makeSolidColor(color.r, color.g, color.b);
-    }
-};
-
 $execute {
-    log::info("RandomColor mod loaded: every sprite will now be a cached colored square!");
+    log::info("RandomColorSprite mod loaded!");
 }
