@@ -101,7 +101,7 @@ class $modify(RandomColorSpriteFrameCache, CCSpriteFrameCache) {
     }
 
     void addSpriteFramesWithFile(const char* plist) {
-        addSpriteFramesWithFile(plist, nullptr);
+        addSpriteFramesWithFile(plist, (const char*)nullptr);
     }
 };
 
