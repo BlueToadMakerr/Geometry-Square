@@ -58,16 +58,16 @@ class $modify(RandomColorSprite, CCSprite) {
         return true;
     }
 
-    // NEW: Hook setTexture to catch dynamic sprites
+    // NEW: Hook setTexture to catch dynamic sprites, preserving original info
     void setTexture(CCTexture2D* texture) {
+        CCSprite::setTexture(texture); // keep original texture info
+
         if (texture) {
             if (g_textureColors.find(texture) == g_textureColors.end()) {
                 g_textureColors[texture] = { (GLubyte)dist(rng), (GLubyte)dist(rng), (GLubyte)dist(rng), 255 };
             }
             auto color = g_textureColors[texture];
-            CCSprite::setTexture(makeSolidColor(color.r, color.g, color.b));
-        } else {
-            CCSprite::setTexture(nullptr);
+            this->setColor(ccc3(color.r, color.g, color.b)); // tint instead of replacing
         }
     }
 };
