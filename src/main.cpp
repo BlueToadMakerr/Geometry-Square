@@ -14,7 +14,6 @@ struct SpriteTask {
 };
 
 static std::queue<SpriteTask> g_queue;
-
 static std::mt19937 rng(std::random_device{}());
 
 static CCTexture2D* makeSolidColor(unsigned char r, unsigned char g, unsigned char b) {
@@ -27,7 +26,7 @@ static CCTexture2D* makeSolidColor(unsigned char r, unsigned char g, unsigned ch
     return tex;
 }
 
-// Worker that processes a few sprites per frame
+// Worker
 void processQueue(float) {
     int count = 0;
     while (!g_queue.empty() && count < 5) {
@@ -35,23 +34,41 @@ void processQueue(float) {
         g_queue.pop();
         count++;
 
-        auto tex = task.texture;
-        auto rect = task.rect;
+        if (!task.sprite || !task.texture) {
+            log::warn("Invalid sprite or texture, skipping");
+            continue;
+        }
 
-        auto rt = CCRenderTexture::create(rect.size.width, rect.size.height);
-        if (!rt) continue;
+        log::info("Processing sprite {:p} with texture {:p}, rect = ({}, {}, {}, {})",
+                  task.sprite, task.texture,
+                  task.rect.origin.x, task.rect.origin.y,
+                  task.rect.size.width, task.rect.size.height);
+
+        auto rt = CCRenderTexture::create(task.rect.size.width, task.rect.size.height);
+        if (!rt) {
+            log::warn("Failed to create render texture");
+            continue;
+        }
+
         rt->beginWithClear(0, 0, 0, 0);
-        auto spr = CCSprite::createWithTexture(tex, rect);
+        auto spr = CCSprite::createWithTexture(task.texture, task.rect);
         spr->setAnchorPoint({0, 0});
         spr->setPosition({0, 0});
         spr->visit();
         rt->end();
 
         auto img = rt->newCCImage();
+        if (!img) {
+            log::warn("Failed to get CCImage from render texture");
+            continue;
+        }
+
         unsigned char* data = img->getData();
         int width = img->getWidth();
         int height = img->getHeight();
-        if (!data || width <= 0 || height <= 0) {
+        int len = img->getDataLen();
+        if (!data || width <= 0 || height <= 0 || len <= 0) {
+            log::warn("No data in CCImage: width={}, height={}, len={}", width, height, len);
             img->release();
             continue;
         }
@@ -79,6 +96,8 @@ void processQueue(float) {
 
         auto solid = makeSolidColor(r, g, b);
         task.sprite->setTexture(solid);
+
+        log::info("Applied random average color ({}, {}, {}) to sprite {:p}", r, g, b, task.sprite);
     }
 }
 
@@ -88,8 +107,10 @@ class $modify(AverageColorSprite, CCSprite) {
         if (!CCSprite::initWithSpriteFrame(frame))
             return false;
 
-        if (frame && frame->getTexture())
+        if (frame && frame->getTexture()) {
             g_queue.push({ this, frame->getTexture(), frame->getRect() });
+            log::info("Queued sprite {:p} from initWithSpriteFrame", this);
+        }
 
         return true;
     }
@@ -98,14 +119,16 @@ class $modify(AverageColorSprite, CCSprite) {
         if (!CCSprite::initWithTexture(texture, rect))
             return false;
 
-        if (texture)
+        if (texture) {
             g_queue.push({ this, texture, rect });
+            log::info("Queued sprite {:p} from initWithTexture", this);
+        }
 
         return true;
     }
 };
 
-// Small helper node to run our queue
+// Helper node to run processQueue
 class ProcessNode : public CCNode {
 public:
     void updateProcess(float dt) {
@@ -130,4 +153,5 @@ public:
 $execute {
     auto node = ProcessNode::create();
     CCDirector::sharedDirector()->getRunningScene()->addChild(node);
+    log::info("ProcessNode added to scene, sprite queue will start processing.");
 }
