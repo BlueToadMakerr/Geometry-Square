@@ -1,0 +1,18 @@
+{
+  "geode": "4.9.0",
+  "gd": {
+    "win": "2.2074",
+    "mac": "2.2074",
+    "ios": "2.2074",
+    "android": "2.2074"
+  },
+  "id": "bluetoadmaker.square",
+  "name": "square",
+  "version": "v1.0.0",
+  "developer": "BlueToadMaker",
+  "tags": ["modtober25", "joke"],
+  "description": "Square",
+  "links": {
+    "source": "https://github.com/BlueToadMakerr/Geometry-Square",
+  }
+}
