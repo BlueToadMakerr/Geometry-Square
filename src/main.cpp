@@ -105,12 +105,29 @@ class $modify(AverageColorSprite, CCSprite) {
     }
 };
 
-// Startup logic
-$execute {
-    auto node = CCNode::create();
-    CCDirector::sharedDirector()->getRunningScene()->addChild(node);
+// Small helper node to run our queue
+class ProcessNode : public CCNode {
+public:
+    void updateProcess(float dt) {
+        processQueue(dt);
+    }
 
-    node->schedule([](float) {
-        processQueue(0);
-    }, 0.05f, "processQueueKey");
+    static ProcessNode* create() {
+        auto ret = new ProcessNode();
+        if (ret && ret->init()) {
+            ret->autorelease();
+            CCDirector::sharedDirector()->getScheduler()->scheduleSelector(
+                schedule_selector(ProcessNode::updateProcess),
+                ret, 0.05f, false
+            );
+            return ret;
+        }
+        CC_SAFE_DELETE(ret);
+        return nullptr;
+    }
+};
+
+$execute {
+    auto node = ProcessNode::create();
+    CCDirector::sharedDirector()->getRunningScene()->addChild(node);
 }
