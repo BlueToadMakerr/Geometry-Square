@@ -7,6 +7,9 @@
 using namespace geode::prelude;
 using namespace cocos2d;
 
+// ---------------------
+// Sprite task queue
+// ---------------------
 struct SpriteTask {
     CCSprite* sprite;
     CCTexture2D* texture;
@@ -16,6 +19,9 @@ struct SpriteTask {
 static std::queue<SpriteTask> g_queue;
 static std::mt19937 rng(std::random_device{}());
 
+// ---------------------
+// Helper to make a 1x1 solid color texture
+// ---------------------
 static CCTexture2D* makeSolidColor(unsigned char r, unsigned char g, unsigned char b) {
     unsigned char pixel[4] = {r, g, b, 255};
     auto img = new CCImage();
@@ -26,10 +32,12 @@ static CCTexture2D* makeSolidColor(unsigned char r, unsigned char g, unsigned ch
     return tex;
 }
 
-// Worker
+// ---------------------
+// Process queue worker
+// ---------------------
 void processQueue(float) {
     int count = 0;
-    while (!g_queue.empty() && count < 5) {
+    while (!g_queue.empty() && count < 5) { // limit per frame
         auto task = g_queue.front();
         g_queue.pop();
         count++;
@@ -39,7 +47,7 @@ void processQueue(float) {
             continue;
         }
 
-        log::info("Processing sprite {:p} with texture {:p}, rect = ({}, {}, {}, {})",
+        log::info("Processing sprite %p with texture %p, rect = (%f, %f, %f, %f)",
                   task.sprite, task.texture,
                   task.rect.origin.x, task.rect.origin.y,
                   task.rect.size.width, task.rect.size.height);
@@ -68,11 +76,12 @@ void processQueue(float) {
         int height = img->getHeight();
         int len = img->getDataLen();
         if (!data || width <= 0 || height <= 0 || len <= 0) {
-            log::warn("No data in CCImage: width={}, height={}, len={}", width, height, len);
+            log::warn("No data in CCImage: width=%d, height=%d, len=%d", width, height, len);
             img->release();
             continue;
         }
 
+        // Sample 10 random pixels
         std::uniform_int_distribution<int> randX(0, width - 1);
         std::uniform_int_distribution<int> randY(0, height - 1);
 
@@ -97,11 +106,14 @@ void processQueue(float) {
         auto solid = makeSolidColor(r, g, b);
         task.sprite->setTexture(solid);
 
-        log::info("Applied random average color ({}, {}, {}) to sprite {:p}", r, g, b, task.sprite);
+        log::info("Applied random average color (%d, %d, %d) to sprite %p",
+                  (int)r, (int)g, (int)b, task.sprite);
     }
 }
 
-// Hook for all sprites
+// ---------------------
+// Hook all CCSprites to queue them
+// ---------------------
 class $modify(AverageColorSprite, CCSprite) {
     bool initWithSpriteFrame(CCSpriteFrame* frame) {
         if (!CCSprite::initWithSpriteFrame(frame))
@@ -109,7 +121,7 @@ class $modify(AverageColorSprite, CCSprite) {
 
         if (frame && frame->getTexture()) {
             g_queue.push({ this, frame->getTexture(), frame->getRect() });
-            log::info("Queued sprite {:p} from initWithSpriteFrame", this);
+            log::info("Queued sprite %p from initWithSpriteFrame", this);
         }
 
         return true;
@@ -121,14 +133,16 @@ class $modify(AverageColorSprite, CCSprite) {
 
         if (texture) {
             g_queue.push({ this, texture, rect });
-            log::info("Queued sprite {:p} from initWithTexture", this);
+            log::info("Queued sprite %p from initWithTexture", this);
         }
 
         return true;
     }
 };
 
-// Helper node to run processQueue
+// ---------------------
+// Helper node to tick processQueue
+// ---------------------
 class ProcessNode : public CCNode {
 public:
     void updateProcess(float dt) {
@@ -150,6 +164,9 @@ public:
     }
 };
 
+// ---------------------
+// Execute on mod load
+// ---------------------
 $execute {
     auto node = ProcessNode::create();
     CCDirector::sharedDirector()->getRunningScene()->addChild(node);
