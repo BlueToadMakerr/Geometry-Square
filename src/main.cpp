@@ -58,34 +58,51 @@ class $modify(RandomColorSprite, CCSprite) {
         return true;
     }
 
-// NEW: Hook setTexture to catch dynamic sprites, skip in-game objects
+// NEW: Hook setTexture to catch dynamic sprites
 void setTexture(CCTexture2D* texture) {
-    // Skip if no texture
-    if (!texture) {
+    if (texture) {
+        // Generate random color if not stored
+        if (g_textureColors.find(texture) == g_textureColors.end()) {
+            g_textureColors[texture] = {
+                (GLubyte)dist(rng),
+                (GLubyte)dist(rng),
+                (GLubyte)dist(rng),
+                255
+            };
+        }
+        auto color = g_textureColors[texture];
+
+        // Check if this sprite is a GameObject (by RTTI name)
+        std::string typeName = typeid(*this).name();
+        bool isGameObject = typeName.find("GameObject") != std::string::npos;
+
+        if (isGameObject) {
+            // Don’t recolor the texture — instead draw an overlay
+            if (!this->getChildByTag(8888)) {
+                auto overlay = CCLayerColor::create(
+                    ccc4(color.r, color.g, color.b, 200),
+                    this->getContentSize().width,
+                    this->getContentSize().height
+                );
+                overlay->setTag(8888);
+                overlay->setAnchorPoint({0.5f, 0.5f});
+                overlay->ignoreAnchorPointForPosition(false);
+                overlay->setPosition(this->getContentSize().width / 2, this->getContentSize().height / 2);
+                overlay->setScaleX(this->getScaleX());
+                overlay->setScaleY(this->getScaleY());
+                overlay->setRotation(this->getRotation());
+                overlay->setZOrder(9999);
+                this->addChild(overlay);
+            }
+            return; // don’t change texture for GameObjects
+        }
+
+        // For everything else (UI, menus, etc.), still recolor
+        CCSprite::setTexture(makeSolidColor(color.r, color.g, color.b));
+    } else {
         CCSprite::setTexture(nullptr);
-        return;
     }
-
-    // Skip in-game objects (heuristic: parent is PlayLayer)
-    auto parent = this->getParent();
-    if (parent && strcmp(typeid(*parent).name(), "PlayLayer") == 0) {
-        CCSprite::setTexture(texture); // keep original texture for objects
-        return;
-    }
-
-    // Apply random solid color for UI / popups
-    if (g_textureColors.find(texture) == g_textureColors.end()) {
-        g_textureColors[texture] = { 
-            (GLubyte)dist(rng), 
-            (GLubyte)dist(rng), 
-            (GLubyte)dist(rng), 
-            255 
-        };
-    }
-    auto color = g_textureColors[texture];
-    CCSprite::setTexture(makeSolidColor(color.r, color.g, color.b));
 }
-
 };
 
 $execute {
