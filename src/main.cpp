@@ -87,29 +87,24 @@ class $modify(PlayLayerInitHook, PlayLayer) {
 };
 
 static void drawGameObjectOverlays(PlayLayer* layer) {
-    if (!layer) return;
+    if (!layer || g_overlayDrawn) return;
+    g_overlayDrawn = true;
+    log::info("We are in!");
 
-    // Clear old overlays (optional, avoids buildup)
-    static CCDrawNode* drawNode = nullptr;
-    if (drawNode) {
-        drawNode->removeFromParentAndCleanup(true);
-        drawNode = nullptr;
-    }
+    auto drawNode = CCDrawNode::create();
+    layer->addChild(drawNode, 9999); // Draw on top of everything
 
-    drawNode = CCDrawNode::create();
-    layer->addChild(drawNode, 9999);
-
-    // Copy objects into a safe vector snapshot
-    std::vector<GameObject*> snapshot;
-    snapshot.reserve(layer->m_objects->count());
+    // Take a snapshot of m_objects to avoid iterator invalidation
+    std::vector<GameObject*> objectsCopy;
+    objectsCopy.reserve(layer->m_objects->count());
     for (auto obj : CCArrayExt<GameObject*>(layer->m_objects)) {
-        snapshot.push_back(obj);
+        if (obj) objectsCopy.push_back(obj);
     }
 
-    // Now iterate safely
-    for (auto obj : snapshot) {
+    for (auto obj : objectsCopy) {
         if (!obj) continue;
-        if (obj->m_parent == nullptr) continue; // skip if already removed
+        if (!obj->m_parent) continue; // skip if removed
+        log::info("Object real!");
 
         auto pos = obj->getPosition();
         auto size = obj->getContentSize();
@@ -123,12 +118,19 @@ static void drawGameObjectOverlays(PlayLayer* layer) {
             dist(rng) / 255.0f,
             dist(rng) / 255.0f,
             dist(rng) / 255.0f,
-            0.4f
+            0.4f // semi-transparent
         };
 
-        drawNode->drawSolidRect(origin, dest, color);
+        CCPoint verts[4] = {
+            origin,
+            {dest.x, origin.y},
+            dest,
+            {origin.x, dest.y}
+        };
+        drawNode->drawPolygon(verts, 4, color, 0, color);
     }
 }
+
 class $modify(PlayLayerOverlayHook, PlayLayer) {
 public:
     void updateOverlays(float dt) {
