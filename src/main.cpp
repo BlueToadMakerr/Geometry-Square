@@ -110,18 +110,11 @@ static void drawGameObjectOverlaysForLayer(CCLayer* layer, CCArray* objects) {
         auto opacity = obj->getOpacity();
         if (opacity == 0) continue;
 
-        auto pos = obj->getPosition();
-        auto parent = obj->getParent();
-        while (parent && parent != layer) {
-            pos.x += parent->getPositionX();
-            pos.y += parent->getPositionY();
-            parent = parent->getParent();
-        }
+        auto center = obj->convertToWorldSpace(CCPointZero);
 
         auto size = obj->getContentSize();
         float sx = obj->getScaleX();
         float sy = obj->getScaleY();
-        CCPoint center = pos;
 
         CCPoint verts[4] = {
             {center.x - size.width*sx/2, center.y - size.height*sy/2},
