@@ -1,6 +1,7 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCSprite.hpp>
 #include <Geode/modify/PlayLayer.hpp>
+#includr <Geode/modify/LevelEditorLayer.hpp>
 #include <cocos2d.h>
 #include <unordered_map>
 #include <random>
@@ -86,35 +87,31 @@ class $modify(PlayLayerInitHook, PlayLayer) {
     }
 };
 
-static void drawGameObjectOverlays(PlayLayer* layer) {
-    if (!layer) return;
+static void drawGameObjectOverlaysForLayer(CCLayer* layer, CCArray* objects) {
+    if (!layer || !objects) return;
 
-    // Get or create overlay node
-    CCDrawNode* drawNode = static_cast<CCDrawNode*>(layer->getChildByTag(9999));
-    if (!drawNode) {
-        drawNode = CCDrawNode::create();
-        layer->addChild(drawNode, 9999, 9999);
-    } else {
-        drawNode->clear(); // reuse instead of recreate
+    // Remove old overlay node if it exists
+    if (auto oldNode = layer->getChildByTag(9999)) {
+        oldNode->removeFromParent();
     }
 
-    // Take a snapshot to avoid iterator invalidation
+    auto drawNode = CCDrawNode::create();
+    layer->addChild(drawNode, 9999, 9999);
+
+    // Copy objects safely
     std::vector<GameObject*> objectsCopy;
-    objectsCopy.reserve(layer->m_objects->count());
-    for (auto obj : CCArrayExt<GameObject*>(layer->m_objects)) {
+    objectsCopy.reserve(objects->count());
+    for (auto obj : CCArrayExt<GameObject*>(objects)) {
         if (obj) objectsCopy.push_back(obj);
     }
 
     for (auto obj : objectsCopy) {
-        if (!obj || !obj->getParent()) continue;
+        if (!obj || !obj->getParent() || !obj->isVisible()) continue;
 
-        // Skip fully invisible objects
         auto opacity = obj->getOpacity();
-        if (opacity <= 0) continue;
+        if (opacity == 0) continue; // skip fully transparent objects
 
         auto pos = obj->getPosition();
-
-        // Respect parent offset (batch layer, etc.)
         auto parent = obj->getParent();
         while (parent && parent != layer) {
             pos.x += parent->getPositionX();
@@ -131,15 +128,16 @@ static void drawGameObjectOverlays(PlayLayer* layer) {
 
         auto cpos = obj->getPosition();
 
-        // Color seed based on position
         unsigned char r = ((int)(cpos.x + cpos.y) * 37) % 256;
         unsigned char g = ((int)(cpos.x * 17 + cpos.y * 29)) % 256;
         unsigned char b = ((int)(cpos.x * 23 + cpos.y * 41)) % 256;
 
-        // Match transparency (scale object opacity 0–255 → 0–1)
-        float alpha = (opacity / 255.0f);
-
-        ccColor4F color = { r / 255.0f, g / 255.0f, b / 255.0f, alpha };
+        ccColor4F color = {
+            r / 255.0f,
+            g / 255.0f,
+            b / 255.0f,
+            opacity / 255.0f
+        };
 
         CCPoint verts[4] = {
             origin,
@@ -151,6 +149,16 @@ static void drawGameObjectOverlays(PlayLayer* layer) {
     }
 }
 
+static void drawGameObjectOverlays(PlayLayer* layer) {
+    if (!layer) return;
+    drawGameObjectOverlaysForLayer(layer, layer->m_objects);
+}
+
+static void drawGameObjectOverlays(LevelEditorLayer* layer) {
+    if (!layer) return;
+    drawGameObjectOverlaysForLayer(layer, layer->m_objects);
+}
+
 class $modify(PlayLayerOverlayHook, PlayLayer) {
 public:
     void updateOverlays(float dt) {
@@ -159,8 +167,21 @@ public:
 
     void onEnterTransitionDidFinish() {
         PlayLayer::onEnterTransitionDidFinish();
-        log::info("Scheduling overlay updates...");
+        log::info("Scheduling overlay updates in PlayLayer...");
         this->schedule(schedule_selector(PlayLayerOverlayHook::updateOverlays), 0.0f);
+    }
+};
+
+class $modify(LevelEditorOverlayHook, LevelEditorLayer) {
+public:
+    void updateOverlays(float dt) {
+        drawGameObjectOverlays(this);
+    }
+
+    void onEnterTransitionDidFinish() {
+        LevelEditorLayer::onEnterTransitionDidFinish();
+        log::info("Scheduling overlay updates in LevelEditorLayer...");
+        this->schedule(schedule_selector(LevelEditorOverlayHook::updateOverlays), 0.0f);
     }
 };
 
