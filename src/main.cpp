@@ -93,12 +93,12 @@ static void drawGameObjectOverlays(PlayLayer* layer) {
     CCDrawNode* drawNode = static_cast<CCDrawNode*>(layer->getChildByTag(9999));
     if (!drawNode) {
         drawNode = CCDrawNode::create();
-        layer->addChild(drawNode, 9999, 9999); // Draw on top of everything
+        layer->addChild(drawNode, 9999, 9999);
     } else {
-        drawNode->clear(); // clear previous frame
+        drawNode->clear(); // reuse instead of recreate
     }
 
-    // Snapshot of m_objects to avoid iterator invalidation
+    // Take a snapshot to avoid iterator invalidation
     std::vector<GameObject*> objectsCopy;
     objectsCopy.reserve(layer->m_objects->count());
     for (auto obj : CCArrayExt<GameObject*>(layer->m_objects)) {
@@ -108,8 +108,13 @@ static void drawGameObjectOverlays(PlayLayer* layer) {
     for (auto obj : objectsCopy) {
         if (!obj || !obj->getParent()) continue;
 
+        // Skip fully invisible objects
+        auto opacity = obj->getOpacity();
+        if (opacity <= 0) continue;
+
         auto pos = obj->getPosition();
 
+        // Respect parent offset (batch layer, etc.)
         auto parent = obj->getParent();
         while (parent && parent != layer) {
             pos.x += parent->getPositionX();
@@ -126,13 +131,22 @@ static void drawGameObjectOverlays(PlayLayer* layer) {
 
         auto cpos = obj->getPosition();
 
+        // Color seed based on position
         unsigned char r = ((int)(cpos.x + cpos.y) * 37) % 256;
         unsigned char g = ((int)(cpos.x * 17 + cpos.y * 29)) % 256;
         unsigned char b = ((int)(cpos.x * 23 + cpos.y * 41)) % 256;
 
-        ccColor4F color = { r / 255.0f, g / 255.0f, b / 255.0f, 0.4f };
+        // Match transparency (scale object opacity 0–255 → 0–1)
+        float alpha = (opacity / 255.0f) * 0.4f; // 0.4f base overlay intensity
 
-        CCPoint verts[4] = { origin, {dest.x, origin.y}, dest, {origin.x, dest.y} };
+        ccColor4F color = { r / 255.0f, g / 255.0f, b / 255.0f, alpha };
+
+        CCPoint verts[4] = {
+            origin,
+            {dest.x, origin.y},
+            dest,
+            {origin.x, dest.y}
+        };
         drawNode->drawPolygon(verts, 4, color, 0, color);
     }
 }
