@@ -126,19 +126,22 @@ static void drawGameObjectOverlays(PlayLayer* layer) {
         CCPoint origin(pos.x - (size.width * sx) / 2, pos.y - (size.height * sy) / 2);
         CCPoint dest(pos.x + (size.width * sx) / 2, pos.y + (size.height * sy) / 2);
 
-        // Use the object's texture name (or pointer) as seed
-        std::hash<std::string> hasher;
-        auto tex = obj->getSprite()->getTexture(); // or getTexture()->getName() if available
-        size_t seed = tex ? (size_t)tex : (size_t)obj; // fallback if no texture name
+        auto cpos = obj->getPosition();
 
-        std::mt19937 objRng(seed); // deterministic RNG per object
-        std::uniform_real_distribution<float> distF(0.0f, 1.0f);
+        // Red channel
+        unsigned char r = ((int)(cpos.x + pos.y) * 37) % 256;
+
+        // Green channel
+        unsigned char g = ((int)(cpos.x * 17 + pos.y * 29)) % 256;
+
+        // Blue channel
+        unsigned char b = ((int)(cpos.x * 23 + pos.y * 41)) % 256;
 
         ccColor4F color = {
-            distF(objRng),
-            distF(objRng),
-            distF(objRng),
-            0.4f
+            r / 255.0f,
+            g / 255.0f,
+            b / 255.0f,
+            0.4f // semi-transparent
         };
 
         CCPoint verts[4] = {
