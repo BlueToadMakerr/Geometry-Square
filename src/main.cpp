@@ -170,6 +170,32 @@ static void drawGameObjectOverlaysForLayer(CCLayer* layer, CCArray* objects) {
     }
 }
 
+static void drawGameObjectOverlays(PlayLayer* layer) {
+    if (!layer) return;
+    drawGameObjectOverlaysForLayer(layer, layer->m_objects);
+}
+
+static void drawGameObjectOverlays(LevelEditorLayer* layer) {
+    if (!layer) return;
+    drawGameObjectOverlaysForLayer(layer, layer->m_objects);
+}
+
+class $modify(LevelEditorOverlayHook, LevelEditorLayer) {
+public:
+    bool init(GJGameLevel* level, bool dontCreateObjects) {
+        if (!LevelEditorLayer::init(level, dontCreateObjects))
+            return false;
+
+        log::info("Scheduling overlay updates in LevelEditorLayer...");
+        this->schedule(schedule_selector(LevelEditorOverlayHook::updateOverlays), 0.0f);
+        return true;
+    }
+
+    void updateOverlays(float dt) {
+        drawGameObjectOverlays(this);
+    }
+};
+
 class $modify(PlayLayerOverlayHook, PlayLayer) {
 public:
     void updateOverlays(float dt) {
