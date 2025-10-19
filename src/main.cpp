@@ -87,10 +87,10 @@ class $modify(PlayLayerInitHook, PlayLayer) {
     }
 };
 
-static void drawGameObjectOverlaysForLayer(CCLayer* layer, CCArray* objects) {
+static void drawGameObjectOverlaysForLayer(CCLayer* layer, CCArray* objects, float cameraRotationDegrees = 0.0f, float camScale = 1.0f) {
     if (!layer || !objects) return;
 
-    // Remove all previous overlay nodes
+    // Remove previous overlay nodes
     std::vector<CCNode*> oldNodes;
     for (auto child : CCArrayExt<CCNode*>(layer->getChildren())) {
         if (child->getTag() == 9999) oldNodes.push_back(child);
@@ -104,6 +104,13 @@ static void drawGameObjectOverlaysForLayer(CCLayer* layer, CCArray* objects) {
         if (obj) objectsCopy.push_back(obj);
     }
 
+    // Get screen center for camera rotation
+    CCPoint screenCenter = {
+        CCDirector::sharedDirector()->getWinSize().width / 2,
+        CCDirector::sharedDirector()->getWinSize().height / 2
+    };
+    float camRot = -CC_DEGREES_TO_RADIANS(cameraRotationDegrees);
+
     for (auto obj : objectsCopy) {
         if (!obj || !obj->getParent() || !obj->isVisible()) continue;
 
@@ -112,45 +119,44 @@ static void drawGameObjectOverlaysForLayer(CCLayer* layer, CCArray* objects) {
 
         auto size = obj->getContentSize();
 
-        // World position of the object
-        CCPoint center = obj->convertToWorldSpace(CCPointZero);
+        // Object anchor in world space
+        auto anchor = obj->getAnchorPointInPoints();
+        CCPoint center = obj->convertToWorldSpace(anchor);
 
-        // Get batch layer (2 levels above)
-        auto batchLayer = obj->getParent()->getParent();
-        if (!batchLayer) batchLayer = obj->getParent(); // fallback
-
-        // Rotation and scale
-        float objRot = -CC_DEGREES_TO_RADIANS(obj->getRotation());
-        float batchRot = -CC_DEGREES_TO_RADIANS(batchLayer->getRotation());
-
-        float sx = obj->getScaleX() + (batchLayer->getScaleX() - 1.0f);
-        float sy = obj->getScaleY() + (batchLayer->getScaleY() - 1.0f);
-
-        // Vertices relative to center
+        // Vertices relative to anchor
         CCPoint verts[4] = {
-            { -size.width * sx / 2, -size.height * sy / 2 },
-            {  size.width * sx / 2, -size.height * sy / 2 },
-            {  size.width * sx / 2,  size.height * sy / 2 },
-            { -size.width * sx / 2,  size.height * sy / 2 }
+            { 0 - anchor.x, 0 - anchor.y },
+            { size.width - anchor.x, 0 - anchor.y },
+            { size.width - anchor.x, size.height - anchor.y },
+            { 0 - anchor.x, size.height - anchor.y }
         };
 
-        // Apply object rotation
+        // Apply object rotation around object center
+        float objRot = -CC_DEGREES_TO_RADIANS(obj->getRotation());
         for (int i = 0; i < 4; ++i) {
             float dx = verts[i].x;
             float dy = verts[i].y;
-            verts[i].x = dx * cos(objRot) - dy * sin(objRot);
-            verts[i].y = dx * sin(objRot) + dy * cos(objRot);
+            verts[i].x = center.x + dx * cos(objRot) - dy * sin(objRot);
+            verts[i].y = center.y + dx * sin(objRot) + dy * cos(objRot);
         }
 
-        // Apply batch layer rotation and translate to world center
+        // Apply camera rotation around screen center
         for (int i = 0; i < 4; ++i) {
-            float dx = verts[i].x;
-            float dy = verts[i].y;
-            verts[i].x = center.x + dx * cos(batchRot) - dy * sin(batchRot);
-            verts[i].y = center.y + dx * sin(batchRot) + dy * cos(batchRot);
+            float dx = verts[i].x - screenCenter.x;
+            float dy = verts[i].y - screenCenter.y;
+            verts[i].x = screenCenter.x + dx * cos(camRot) - dy * sin(camRot);
+            verts[i].y = screenCenter.y + dx * sin(camRot) + dy * cos(camRot);
         }
 
-        // Color seed based on object position
+        // Apply camera scale
+        if (camScale != 1.0f) {
+            for (int i = 0; i < 4; ++i) {
+                verts[i].x = screenCenter.x + (verts[i].x - screenCenter.x) * camScale;
+                verts[i].y = screenCenter.y + (verts[i].y - screenCenter.y) * camScale;
+            }
+        }
+
+        // Color based on object position
         auto cpos = obj->getPosition();
         unsigned char r = ((int)(cpos.x + cpos.y) * 37) % 256;
         unsigned char g = ((int)(cpos.x * 17 + cpos.y * 29)) % 256;
@@ -163,7 +169,7 @@ static void drawGameObjectOverlaysForLayer(CCLayer* layer, CCArray* objects) {
             opacity / 255.0f
         };
 
-        // Create a drawNode per object to respect z-order
+        // Draw node
         auto drawNode = CCDrawNode::create();
         layer->addChild(drawNode, obj->getZOrder(), 9999);
         drawNode->drawPolygon(verts, 4, color, 0, color);
