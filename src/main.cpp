@@ -86,19 +86,31 @@ class $modify(PlayLayerInitHook, PlayLayer) {
     }
 };
 
-// Draw overlays on all GameObjects
 static void drawGameObjectOverlays(PlayLayer* layer) {
-    if (!layer || g_overlayDrawn) return;
-    g_overlayDrawn = true;
-    log::info("We are in!");
+    if (!layer) return;
 
-    auto drawNode = CCDrawNode::create();
-    layer->addChild(drawNode, 9999); // Draw on top of everything
+    // Clear old overlays (optional, avoids buildup)
+    static CCDrawNode* drawNode = nullptr;
+    if (drawNode) {
+        drawNode->removeFromParentAndCleanup(true);
+        drawNode = nullptr;
+    }
 
+    drawNode = CCDrawNode::create();
+    layer->addChild(drawNode, 9999);
+
+    // Copy objects into a safe vector snapshot
+    std::vector<GameObject*> snapshot;
+    snapshot.reserve(layer->m_objects->count());
     for (auto obj : CCArrayExt<GameObject*>(layer->m_objects)) {
-        log::info("Object found");
+        snapshot.push_back(obj);
+    }
+
+    // Now iterate safely
+    for (auto obj : snapshot) {
         if (!obj) continue;
-        log::info("Object real!");
+        if (obj->m_parent == nullptr) continue; // skip if already removed
+
         auto pos = obj->getPosition();
         auto size = obj->getContentSize();
         float sx = obj->getScaleX();
@@ -111,14 +123,12 @@ static void drawGameObjectOverlays(PlayLayer* layer) {
             dist(rng) / 255.0f,
             dist(rng) / 255.0f,
             dist(rng) / 255.0f,
-            0.4f // semi-transparent
+            0.4f
         };
 
-        CCPoint verts[4] = {origin, {dest.x, origin.y}, dest, {origin.x, dest.y}};
-drawNode->drawPolygon(verts, 4, color, 0, color);
+        drawNode->drawSolidRect(origin, dest, color);
     }
 }
-
 class $modify(PlayLayerOverlayHook, PlayLayer) {
 public:
     void updateOverlays(float dt) {
