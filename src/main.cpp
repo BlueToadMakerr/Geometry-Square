@@ -89,16 +89,16 @@ class $modify(PlayLayerInitHook, PlayLayer) {
 static void drawGameObjectOverlays(PlayLayer* layer) {
     if (!layer) return;
 
-    // Remove any previous overlay node if it exists
-    if (auto oldNode = layer->getChildByTag(9999)) {
-        oldNode->removeFromParent();
+    // Get or create overlay node
+    CCDrawNode* drawNode = static_cast<CCDrawNode*>(layer->getChildByTag(9999));
+    if (!drawNode) {
+        drawNode = CCDrawNode::create();
+        layer->addChild(drawNode, 9999, 9999); // Draw on top of everything
+    } else {
+        drawNode->clear(); // clear previous frame
     }
 
-    // Create new draw node
-    auto drawNode = CCDrawNode::create();
-    layer->addChild(drawNode, 9999, 9999); // Draw on top of everything
-
-    // Take a snapshot of m_objects to avoid iterator invalidation
+    // Snapshot of m_objects to avoid iterator invalidation
     std::vector<GameObject*> objectsCopy;
     objectsCopy.reserve(layer->m_objects->count());
     for (auto obj : CCArrayExt<GameObject*>(layer->m_objects)) {
@@ -106,12 +106,10 @@ static void drawGameObjectOverlays(PlayLayer* layer) {
     }
 
     for (auto obj : objectsCopy) {
-        if (!obj) continue;
-        if (!obj->getParent()) continue; // skip if removed
+        if (!obj || !obj->getParent()) continue;
 
         auto pos = obj->getPosition();
 
-        // Get the camera's position and offset the object by that
         auto parent = obj->getParent();
         while (parent && parent != layer) {
             pos.x += parent->getPositionX();
@@ -128,28 +126,13 @@ static void drawGameObjectOverlays(PlayLayer* layer) {
 
         auto cpos = obj->getPosition();
 
-        // Red channel
         unsigned char r = ((int)(cpos.x + cpos.y) * 37) % 256;
-
-        // Green channel
         unsigned char g = ((int)(cpos.x * 17 + cpos.y * 29)) % 256;
-
-        // Blue channel
         unsigned char b = ((int)(cpos.x * 23 + cpos.y * 41)) % 256;
 
-        ccColor4F color = {
-            r / 255.0f,
-            g / 255.0f,
-            b / 255.0f,
-            0.4f // semi-transparent
-        };
+        ccColor4F color = { r / 255.0f, g / 255.0f, b / 255.0f, 0.4f };
 
-        CCPoint verts[4] = {
-            origin,
-            {dest.x, origin.y},
-            dest,
-            {origin.x, dest.y}
-        };
+        CCPoint verts[4] = { origin, {dest.x, origin.y}, dest, {origin.x, dest.y} };
         drawNode->drawPolygon(verts, 4, color, 0, color);
     }
 }
