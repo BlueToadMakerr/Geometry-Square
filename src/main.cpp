@@ -87,10 +87,10 @@ class $modify(PlayLayerInitHook, PlayLayer) {
     }
 };
 
-static void drawGameObjectOverlaysForLayer(CCLayer* layer, CCArray* objects, float cameraRotationDegrees = 0.0f, float camScale = 1.0f) {
+static void drawGameObjectOverlaysForLayer(CCLayer* layer, CCArray* objects) {
     if (!layer || !objects) return;
 
-    // Remove previous overlay nodes
+    // Remove all previous overlay nodes
     std::vector<CCNode*> oldNodes;
     for (auto child : CCArrayExt<CCNode*>(layer->getChildren())) {
         if (child->getTag() == 9999) oldNodes.push_back(child);
@@ -104,59 +104,43 @@ static void drawGameObjectOverlaysForLayer(CCLayer* layer, CCArray* objects, flo
         if (obj) objectsCopy.push_back(obj);
     }
 
-    // Get screen center for camera rotation
-    CCPoint screenCenter = {
-        CCDirector::sharedDirector()->getWinSize().width / 2,
-        CCDirector::sharedDirector()->getWinSize().height / 2
-    };
-    float camRot = -CC_DEGREES_TO_RADIANS(cameraRotationDegrees);
-
     for (auto obj : objectsCopy) {
         if (!obj || !obj->getParent() || !obj->isVisible()) continue;
 
         auto opacity = obj->getOpacity();
         if (opacity == 0) continue;
 
+        auto pos = obj->getPosition();
+        auto parent = obj->getParent();
+        while (parent && parent != layer) {
+            pos.x += parent->getPositionX();
+            pos.y += parent->getPositionY();
+            parent = parent->getParent();
+        }
+
         auto size = obj->getContentSize();
+        float sx = obj->getScaleX();
+        float sy = obj->getScaleY();
+        CCPoint center = pos;
 
-        // Object anchor in world space
-        auto anchor = obj->getAnchorPointInPoints();
-        CCPoint center = obj->convertToWorldSpace(anchor);
-
-        // Vertices relative to anchor
         CCPoint verts[4] = {
-            { 0 - anchor.x, 0 - anchor.y },
-            { size.width - anchor.x, 0 - anchor.y },
-            { size.width - anchor.x, size.height - anchor.y },
-            { 0 - anchor.x, size.height - anchor.y }
+            {center.x - size.width*sx/2, center.y - size.height*sy/2},
+            {center.x + size.width*sx/2, center.y - size.height*sy/2},
+            {center.x + size.width*sx/2, center.y + size.height*sy/2},
+            {center.x - size.width*sx/2, center.y + size.height*sy/2}
         };
 
-        // Apply object rotation around object center
-        float objRot = -CC_DEGREES_TO_RADIANS(obj->getRotation());
+        // Apply rotation
+        float rot = obj->getRotation();
+        float rad = -CC_DEGREES_TO_RADIANS(rot);
         for (int i = 0; i < 4; ++i) {
-            float dx = verts[i].x;
-            float dy = verts[i].y;
-            verts[i].x = center.x + dx * cos(objRot) - dy * sin(objRot);
-            verts[i].y = center.y + dx * sin(objRot) + dy * cos(objRot);
+            float dx = verts[i].x - center.x;
+            float dy = verts[i].y - center.y;
+            verts[i].x = center.x + dx * cos(rad) - dy * sin(rad);
+            verts[i].y = center.y + dx * sin(rad) + dy * cos(rad);
         }
 
-        // Apply camera rotation around screen center
-        for (int i = 0; i < 4; ++i) {
-            float dx = verts[i].x - screenCenter.x;
-            float dy = verts[i].y - screenCenter.y;
-            verts[i].x = screenCenter.x + dx * cos(camRot) - dy * sin(camRot);
-            verts[i].y = screenCenter.y + dx * sin(camRot) + dy * cos(camRot);
-        }
-
-        // Apply camera scale
-        if (camScale != 1.0f) {
-            for (int i = 0; i < 4; ++i) {
-                verts[i].x = screenCenter.x + (verts[i].x - screenCenter.x) * camScale;
-                verts[i].y = screenCenter.y + (verts[i].y - screenCenter.y) * camScale;
-            }
-        }
-
-        // Color based on object position
+        // Color seed based on position
         auto cpos = obj->getPosition();
         unsigned char r = ((int)(cpos.x + cpos.y) * 37) % 256;
         unsigned char g = ((int)(cpos.x * 17 + cpos.y * 29)) % 256;
@@ -169,9 +153,9 @@ static void drawGameObjectOverlaysForLayer(CCLayer* layer, CCArray* objects, flo
             opacity / 255.0f
         };
 
-        // Draw node
+        // Create a drawNode per object to respect z-order
         auto drawNode = CCDrawNode::create();
-        layer->addChild(drawNode, obj->getZOrder(), 9999);
+        layer->addChild(drawNode, obj->getZOrder(), 9999); // tag = 9999 to identify overlays
         drawNode->drawPolygon(verts, 4, color, 0, color);
     }
 }
