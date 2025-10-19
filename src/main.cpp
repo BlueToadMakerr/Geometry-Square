@@ -111,14 +111,13 @@ static void drawGameObjectOverlays(PlayLayer* layer) {
 
         auto pos = obj->getPosition();
         // Get the camera's position and offset the object by that
-        auto pos = obj->getPosition();
-
         auto parent = obj->getParent();
         while (parent && parent != layer) {
             pos.x += parent->getPositionX();
             pos.y += parent->getPositionY();
             parent = parent->getParent();
         }
+
         auto size = obj->getContentSize();
         float sx = obj->getScaleX();
         float sy = obj->getScaleY();
