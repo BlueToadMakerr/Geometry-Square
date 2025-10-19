@@ -1,7 +1,7 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCSprite.hpp>
 #include <Geode/modify/PlayLayer.hpp>
-#includr <Geode/modify/LevelEditorLayer.hpp>
+#include <Geode/modify/LevelEditorLayer.hpp>
 #include <cocos2d.h>
 #include <unordered_map>
 #include <random>
