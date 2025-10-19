@@ -90,14 +90,12 @@ class $modify(PlayLayerInitHook, PlayLayer) {
 static void drawGameObjectOverlaysForLayer(CCLayer* layer, CCArray* objects) {
     if (!layer || !objects) return;
 
-    // Get or create overlay node
-    CCDrawNode* drawNode = static_cast<CCDrawNode*>(layer->getChildByTag(9999));
-    if (!drawNode) {
-        drawNode = CCDrawNode::create();
-        layer->addChild(drawNode, 9999, 9999);
-    } else {
-        drawNode->clear(); // reuse existing node instead of recreating
+    // Remove all previous overlay nodes
+    std::vector<CCNode*> oldNodes;
+    for (auto child : CCArrayExt<CCNode*>(layer->getChildren())) {
+        if (child->getTag() == 9999) oldNodes.push_back(child);
     }
+    for (auto node : oldNodes) node->removeFromParent();
 
     // Copy objects safely
     std::vector<GameObject*> objectsCopy;
@@ -110,7 +108,7 @@ static void drawGameObjectOverlaysForLayer(CCLayer* layer, CCArray* objects) {
         if (!obj || !obj->getParent() || !obj->isVisible()) continue;
 
         auto opacity = obj->getOpacity();
-        if (opacity == 0) continue; // skip fully transparent objects
+        if (opacity == 0) continue;
 
         auto pos = obj->getPosition();
         auto parent = obj->getParent();
@@ -123,12 +121,27 @@ static void drawGameObjectOverlaysForLayer(CCLayer* layer, CCArray* objects) {
         auto size = obj->getContentSize();
         float sx = obj->getScaleX();
         float sy = obj->getScaleY();
+        CCPoint center = pos;
 
-        CCPoint origin(pos.x - (size.width * sx) / 2, pos.y - (size.height * sy) / 2);
-        CCPoint dest(pos.x + (size.width * sx) / 2, pos.y + (size.height * sy) / 2);
+        CCPoint verts[4] = {
+            {center.x - size.width*sx/2, center.y - size.height*sy/2},
+            {center.x + size.width*sx/2, center.y - size.height*sy/2},
+            {center.x + size.width*sx/2, center.y + size.height*sy/2},
+            {center.x - size.width*sx/2, center.y + size.height*sy/2}
+        };
 
+        // Apply rotation
+        float rot = obj->getRotation();
+        float rad = -CC_DEGREES_TO_RADIANS(rot);
+        for (int i = 0; i < 4; ++i) {
+            float dx = verts[i].x - center.x;
+            float dy = verts[i].y - center.y;
+            verts[i].x = center.x + dx * cos(rad) - dy * sin(rad);
+            verts[i].y = center.y + dx * sin(rad) + dy * cos(rad);
+        }
+
+        // Color seed based on position
         auto cpos = obj->getPosition();
-
         unsigned char r = ((int)(cpos.x + cpos.y) * 37) % 256;
         unsigned char g = ((int)(cpos.x * 17 + cpos.y * 29)) % 256;
         unsigned char b = ((int)(cpos.x * 23 + cpos.y * 41)) % 256;
@@ -140,12 +153,9 @@ static void drawGameObjectOverlaysForLayer(CCLayer* layer, CCArray* objects) {
             opacity / 255.0f
         };
 
-        CCPoint verts[4] = {
-            origin,
-            {dest.x, origin.y},
-            dest,
-            {origin.x, dest.y}
-        };
+        // Create a drawNode per object to respect z-order
+        auto drawNode = CCDrawNode::create();
+        layer->addChild(drawNode, obj->getZOrder(), 9999); // tag = 9999 to identify overlays
         drawNode->drawPolygon(verts, 4, color, 0, color);
     }
 }
@@ -166,7 +176,7 @@ public:
         if (!LevelEditorLayer::init(level, dontCreateObjects))
             return false;
 
-        log::info("Scheduling overlay updates in PlayLayer...");
+        log::info("Scheduling overlay updates in LevelEditorLayer...");
         this->schedule(schedule_selector(LevelEditorOverlayHook::updateOverlays), 0.0f);
         return true;
     }
