@@ -160,16 +160,19 @@ static void drawGameObjectOverlays(LevelEditorLayer* layer) {
     drawGameObjectOverlaysForLayer(layer, layer->m_objects);
 }
 
-class $modify(PlayLayerOverlayHook, PlayLayer) {
+class $modify(LevelEditorOverlayHook, LevelEditorLayer) {
 public:
-    void updateOverlays(float dt) {
-        drawGameObjectOverlays(this);
+    bool init(GJGameLevel* level) {
+        if (!LevelEditorLayer::init(level))
+            return false;
+
+        log::info("Scheduling editor overlay updates...");
+        this->schedule(schedule_selector(LevelEditorOverlayHook::updateOverlays), 0.0f);
+        return true;
     }
 
-    void onEnterTransitionDidFinish() {
-        PlayLayer::onEnterTransitionDidFinish();
-        log::info("Scheduling overlay updates in PlayLayer...");
-        this->schedule(schedule_selector(PlayLayerOverlayHook::updateOverlays), 0.0f);
+    void updateOverlays(float dt) {
+        drawGameObjectOverlays(this);
     }
 };
 
