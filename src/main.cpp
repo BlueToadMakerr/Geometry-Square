@@ -117,18 +117,15 @@ drawNode->drawPolygon(verts, 4, color, 0, color);
     }
 }
 
-// Hook PlayLayer to schedule overlay after transition
 class $modify(PlayLayerOverlayHook, PlayLayer) {
 public:
-    void scheduleOverlay(float dt) {
-        drawGameObjectOverlays(this);
-    }
+    void onEnter() {
+        PlayLayer::onEnter();
 
-    void onEnterTransitionDidFinish() {
-        PlayLayer::onEnterTransitionDidFinish();
-        if (g_playLayerReady) {
-            this->scheduleOnce(schedule_selector(PlayLayerOverlayHook::scheduleOverlay), 0.1f);
-        }
+        // Schedule drawGameObjectOverlays at 30 FPS
+        this->schedule([=](float){
+            drawGameObjectOverlays(this);
+        }, 0.0333f, "object_overlay_30fps"); // ~30 FPS
     }
 };
 
