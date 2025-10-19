@@ -87,12 +87,16 @@ class $modify(PlayLayerInitHook, PlayLayer) {
 };
 
 static void drawGameObjectOverlays(PlayLayer* layer) {
-    if (!layer || g_overlayDrawn) return;
-    g_overlayDrawn = true;
-    log::info("We are in!");
+    if (!layer) return;
 
+    // Remove any previous overlay node if it exists
+    if (auto oldNode = layer->getChildByTag(9999)) {
+        oldNode->removeFromParent();
+    }
+
+    // Create new draw node
     auto drawNode = CCDrawNode::create();
-    layer->addChild(drawNode, 9999); // Draw on top of everything
+    layer->addChild(drawNode, 9999, 9999); // Draw on top of everything
 
     // Take a snapshot of m_objects to avoid iterator invalidation
     std::vector<GameObject*> objectsCopy;
@@ -104,7 +108,6 @@ static void drawGameObjectOverlays(PlayLayer* layer) {
     for (auto obj : objectsCopy) {
         if (!obj) continue;
         if (!obj->getParent()) continue; // skip if removed
-        log::info("Object real!");
 
         auto pos = obj->getPosition();
         auto size = obj->getContentSize();
