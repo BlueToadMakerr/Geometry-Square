@@ -129,13 +129,13 @@ static void drawGameObjectOverlays(PlayLayer* layer) {
         auto cpos = obj->getPosition();
 
         // Red channel
-        unsigned char r = ((int)(cpos.x + pos.y) * 37) % 256;
+        unsigned char r = ((int)(cpos.x + cpos.y) * 37) % 256;
 
         // Green channel
-        unsigned char g = ((int)(cpos.x * 17 + pos.y * 29)) % 256;
+        unsigned char g = ((int)(cpos.x * 17 + cpos.y * 29)) % 256;
 
         // Blue channel
-        unsigned char b = ((int)(cpos.x * 23 + pos.y * 41)) % 256;
+        unsigned char b = ((int)(cpos.x * 23 + cpos.y * 41)) % 256;
 
         ccColor4F color = {
             r / 255.0f,
