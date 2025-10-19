@@ -16,7 +16,7 @@ static std::unordered_map<CCTexture2D*, cocos2d::ccColor4B> g_textureColors;
 
 // Creates a solid color texture
 static CCTexture2D* makeSolidColor(unsigned char r, unsigned char g, unsigned char b) {
-    unsigned char pixel[4] = {r, g, b, 255};
+    unsigned char pixel[4] = { r, g, b, 255 };
     auto img = new CCImage();
     img->initWithImageData(pixel, sizeof(pixel), CCImage::kFmtRawData, 1, 1, 8);
     auto tex = new CCTexture2D();
@@ -58,8 +58,22 @@ class $modify(RandomColorSprite, CCSprite) {
         return true;
     }
 
+    void setTexture(CCTexture2D* texture) {
+        if (texture) {
+            if (g_textureColors.find(texture) == g_textureColors.end()) {
+                g_textureColors[texture] = { (GLubyte)dist(rng), (GLubyte)dist(rng), (GLubyte)dist(rng), 255 };
+            }
+            auto color = g_textureColors[texture];
+            CCSprite::setTexture(makeSolidColor(color.r, color.g, color.b));
+        } else {
+            CCSprite::setTexture(nullptr);
+        }
+    }
+};
+
 // Track when the PlayLayer is ready
 static bool g_playLayerReady = false;
+static bool g_overlayDrawn = false;
 
 // Hook PlayLayer::init to mark ready
 class $modify(PlayLayerInitHook, PlayLayer) {
@@ -71,46 +85,46 @@ class $modify(PlayLayerInitHook, PlayLayer) {
     }
 };
 
-// NEW: Hook setTexture to catch dynamic sprites
-void setTexture(CCTexture2D* texture) {
-    if (texture) {
-        if (g_textureColors.find(texture) == g_textureColors.end()) {
-            g_textureColors[texture] = {
-                (GLubyte)dist(rng),
-                (GLubyte)dist(rng),
-                (GLubyte)dist(rng),
-                255
-            };
-        }
-        auto color = g_textureColors[texture];
+// Draw overlays on all GameObjects
+static void drawGameObjectOverlays(PlayLayer* layer) {
+    if (!layer || g_overlayDrawn) return;
+    g_overlayDrawn = true;
 
-        std::string typeName = typeid(*this).name();
-        bool isGameObject = typeName.find("GameObject") != std::string::npos;
+    auto drawNode = CCDrawNode::create();
+    layer->addChild(drawNode, 9999); // Draw on top of everything
 
-        if (isGameObject) {
-            // Only draw overlay AFTER PlayLayer is fully loaded
-            if (g_playLayerReady && !this->getChildByTag(8888)) {
-                auto overlay = CCLayerColor::create(
-                    ccc4(color.r, color.g, color.b, 120),
-                    this->getContentSize().width * this->getScaleX(),
-                    this->getContentSize().height * this->getScaleY()
-                );
-                overlay->setAnchorPoint({0.5f, 0.5f});
-                overlay->ignoreAnchorPointForPosition(false);
-                overlay->setPosition(this->getContentSize().width / 2, this->getContentSize().height / 2);
-                overlay->setRotation(this->getRotation());
-                overlay->setTag(8888);
-                this->addChild(overlay, 9999);
-            }
-            return; // don't recolor GameObject textures
-        }
+    for (auto obj : CCArrayExt<GameObject*>(layer->m_objects)) {
+        if (!obj) continue;
 
-        // Everything else (menus, popups, etc.)
-        CCSprite::setTexture(makeSolidColor(color.r, color.g, color.b));
-    } else {
-        CCSprite::setTexture(nullptr);
+        auto pos = obj->getPosition();
+        auto size = obj->getContentSize();
+        float sx = obj->getScaleX();
+        float sy = obj->getScaleY();
+
+        CCPoint origin(pos.x - (size.width * sx) / 2, pos.y - (size.height * sy) / 2);
+        CCPoint dest(pos.x + (size.width * sx) / 2, pos.y + (size.height * sy) / 2);
+
+        ccColor4F color = {
+            dist(rng) / 255.0f,
+            dist(rng) / 255.0f,
+            dist(rng) / 255.0f,
+            0.4f // semi-transparent
+        };
+
+        drawNode->drawSolidRect(origin, dest, color);
     }
 }
+
+// Hook PlayLayer to schedule overlay after transition
+class $modify(PlayLayerOverlayHook, PlayLayer) {
+    void onEnterTransitionDidFinish() {
+        PlayLayer::onEnterTransitionDidFinish();
+        if (g_playLayerReady) {
+            this->scheduleOnce([=](float) {
+                drawGameObjectOverlays(this);
+            }, 0.1f, "draw_overlays");
+        }
+    }
 };
 
 $execute {
