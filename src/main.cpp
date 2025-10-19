@@ -164,7 +164,7 @@ public:
     void onEnterTransitionDidFinish() {
         PlayLayer::onEnterTransitionDidFinish();
         log::info("Scheduling overlay updates...");
-        this->schedule(schedule_selector(PlayLayerOverlayHook::updateOverlays), 1.0f / 30.0f);
+        this->schedule(schedule_selector(PlayLayerOverlayHook::updateOverlays), 0.0f);
     }
 };
 
