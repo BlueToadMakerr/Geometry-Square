@@ -110,30 +110,47 @@ static void drawGameObjectOverlaysForLayer(CCLayer* layer, CCArray* objects) {
         auto opacity = obj->getOpacity();
         if (opacity == 0) continue;
 
-        auto center = obj->convertToWorldSpace(CCPointZero);
-
         auto size = obj->getContentSize();
-        float sx = obj->getScaleX();
-        float sy = obj->getScaleY();
 
+        // World position of the object
+        CCPoint center = obj->convertToWorldSpace(CCPointZero);
+
+        // Get batch layer (2 levels above)
+        auto batchLayer = obj->getParent()->getParent();
+        if (!batchLayer) batchLayer = obj->getParent(); // fallback
+
+        // Rotation and scale
+        float objRot = -CC_DEGREES_TO_RADIANS(obj->getRotation());
+        float batchRot = -CC_DEGREES_TO_RADIANS(batchLayer->getRotation());
+
+        float sx = obj->getScaleX() + (batchLayer->getScaleX() - 1.0f);
+        float sy = obj->getScaleY() + (batchLayer->getScaleY() - 1.0f);
+
+        // Vertices relative to center
         CCPoint verts[4] = {
-            {center.x - size.width*sx/2, center.y - size.height*sy/2},
-            {center.x + size.width*sx/2, center.y - size.height*sy/2},
-            {center.x + size.width*sx/2, center.y + size.height*sy/2},
-            {center.x - size.width*sx/2, center.y + size.height*sy/2}
+            { -size.width * sx / 2, -size.height * sy / 2 },
+            {  size.width * sx / 2, -size.height * sy / 2 },
+            {  size.width * sx / 2,  size.height * sy / 2 },
+            { -size.width * sx / 2,  size.height * sy / 2 }
         };
 
-        // Apply rotation
-        float rot = obj->getRotation();
-        float rad = -CC_DEGREES_TO_RADIANS(rot);
+        // Apply object rotation
         for (int i = 0; i < 4; ++i) {
-            float dx = verts[i].x - center.x;
-            float dy = verts[i].y - center.y;
-            verts[i].x = center.x + dx * cos(rad) - dy * sin(rad);
-            verts[i].y = center.y + dx * sin(rad) + dy * cos(rad);
+            float dx = verts[i].x;
+            float dy = verts[i].y;
+            verts[i].x = dx * cos(objRot) - dy * sin(objRot);
+            verts[i].y = dx * sin(objRot) + dy * cos(objRot);
         }
 
-        // Color seed based on position
+        // Apply batch layer rotation and translate to world center
+        for (int i = 0; i < 4; ++i) {
+            float dx = verts[i].x;
+            float dy = verts[i].y;
+            verts[i].x = center.x + dx * cos(batchRot) - dy * sin(batchRot);
+            verts[i].y = center.y + dx * sin(batchRot) + dy * cos(batchRot);
+        }
+
+        // Color seed based on object position
         auto cpos = obj->getPosition();
         unsigned char r = ((int)(cpos.x + cpos.y) * 37) % 256;
         unsigned char g = ((int)(cpos.x * 17 + cpos.y * 29)) % 256;
@@ -148,37 +165,10 @@ static void drawGameObjectOverlaysForLayer(CCLayer* layer, CCArray* objects) {
 
         // Create a drawNode per object to respect z-order
         auto drawNode = CCDrawNode::create();
-        layer->addChild(drawNode, obj->getZOrder(), 9999); // tag = 9999 to identify overlays
+        layer->addChild(drawNode, obj->getZOrder(), 9999);
         drawNode->drawPolygon(verts, 4, color, 0, color);
     }
 }
-
-static void drawGameObjectOverlays(PlayLayer* layer) {
-    if (!layer) return;
-    drawGameObjectOverlaysForLayer(layer, layer->m_objects);
-}
-
-static void drawGameObjectOverlays(LevelEditorLayer* layer) {
-    if (!layer) return;
-    drawGameObjectOverlaysForLayer(layer, layer->m_objects);
-}
-
-class $modify(LevelEditorOverlayHook, LevelEditorLayer) {
-public:
-    bool init(GJGameLevel* level, bool dontCreateObjects) {
-        if (!LevelEditorLayer::init(level, dontCreateObjects))
-            return false;
-
-        log::info("Scheduling overlay updates in LevelEditorLayer...");
-        this->schedule(schedule_selector(LevelEditorOverlayHook::updateOverlays), 0.0f);
-        return true;
-    }
-
-    void updateOverlays(float dt) {
-        drawGameObjectOverlays(this);
-    }
-};
-
 
 class $modify(PlayLayerOverlayHook, PlayLayer) {
 public:
