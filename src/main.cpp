@@ -103,7 +103,7 @@ static void drawGameObjectOverlays(PlayLayer* layer) {
 
     for (auto obj : objectsCopy) {
         if (!obj) continue;
-        if (!obj->m_parent) continue; // skip if removed
+        if (!obj->getParent()) continue; // skip if removed
         log::info("Object real!");
 
         auto pos = obj->getPosition();
