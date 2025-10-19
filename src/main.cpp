@@ -121,16 +121,14 @@ drawNode->drawPolygon(verts, 4, color, 0, color);
 
 class $modify(PlayLayerOverlayHook, PlayLayer) {
 public:
-    // This function will be called 30 times per second
     void updateOverlays(float dt) {
+        log::info("updateOverlays tick");
         drawGameObjectOverlays(this);
-        log::info("drawGameObjectOverlays ran");
     }
 
-    void onEnter() {
-        PlayLayer::onEnter();
-
-        // Schedule repeating at 30 FPS
+    void onEnterTransitionDidFinish() {
+        PlayLayer::onEnterTransitionDidFinish();
+        log::info("Scheduling overlay updates...");
         this->schedule(schedule_selector(PlayLayerOverlayHook::updateOverlays), 1.0f / 30.0f);
     }
 };
