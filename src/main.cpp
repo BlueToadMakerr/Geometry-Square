@@ -90,13 +90,15 @@ class $modify(PlayLayerInitHook, PlayLayer) {
 static void drawGameObjectOverlays(PlayLayer* layer) {
     if (!layer || g_overlayDrawn) return;
     g_overlayDrawn = true;
+    log::info("We are in!");
 
     auto drawNode = CCDrawNode::create();
     layer->addChild(drawNode, 9999); // Draw on top of everything
 
     for (auto obj : CCArrayExt<GameObject*>(layer->m_objects)) {
+        log::info("Object found");
         if (!obj) continue;
-
+        log::info("Object real!");
         auto pos = obj->getPosition();
         auto size = obj->getContentSize();
         float sx = obj->getScaleX();
@@ -122,6 +124,7 @@ public:
     // This function will be called 30 times per second
     void updateOverlays(float dt) {
         drawGameObjectOverlays(this);
+        log::info("drawGameObjectOverlays ran");
     }
 
     void onEnter() {
