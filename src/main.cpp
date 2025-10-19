@@ -1,5 +1,6 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCSprite.hpp>
+#include <Geode/modify/PlayLayer.hpp>
 #include <cocos2d.h>
 #include <unordered_map>
 #include <random>
@@ -79,7 +80,7 @@ static bool g_overlayDrawn = false;
 class $modify(PlayLayerInitHook, PlayLayer) {
     bool init(GJGameLevel* level) {
         g_playLayerReady = false;
-        auto result = PlayLayer::init(level);
+        auto result = PlayLayer::init(level, false, false);
         g_playLayerReady = true;
         return result;
     }
@@ -111,18 +112,22 @@ static void drawGameObjectOverlays(PlayLayer* layer) {
             0.4f // semi-transparent
         };
 
-        drawNode->drawSolidRect(origin, dest, color);
+        CCPoint verts[4] = {origin, {dest.x, origin.y}, dest, {origin.x, dest.y}};
+drawNode->drawPolygon(verts, 4, color, 0, color);
     }
 }
 
 // Hook PlayLayer to schedule overlay after transition
 class $modify(PlayLayerOverlayHook, PlayLayer) {
+public:
+    void scheduleOverlay(float dt) {
+        drawGameObjectOverlays(this);
+    }
+
     void onEnterTransitionDidFinish() {
         PlayLayer::onEnterTransitionDidFinish();
         if (g_playLayerReady) {
-            this->scheduleOnce([=](float) {
-                drawGameObjectOverlays(this);
-            }, 0.1f, "draw_overlays");
+            this->scheduleOnce(schedule_selector(PlayLayerOverlayHook::scheduleOverlay), 0.1f);
         }
     }
 };
