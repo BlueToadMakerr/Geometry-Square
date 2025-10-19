@@ -90,13 +90,14 @@ class $modify(PlayLayerInitHook, PlayLayer) {
 static void drawGameObjectOverlaysForLayer(CCLayer* layer, CCArray* objects) {
     if (!layer || !objects) return;
 
-    // Remove old overlay node if it exists
-    if (auto oldNode = layer->getChildByTag(9999)) {
-        oldNode->removeFromParent();
+    // Get or create overlay node
+    CCDrawNode* drawNode = static_cast<CCDrawNode*>(layer->getChildByTag(9999));
+    if (!drawNode) {
+        drawNode = CCDrawNode::create();
+        layer->addChild(drawNode, 9999, 9999);
+    } else {
+        drawNode->clear(); // reuse existing node instead of recreating
     }
-
-    auto drawNode = CCDrawNode::create();
-    layer->addChild(drawNode, 9999, 9999);
 
     // Copy objects safely
     std::vector<GameObject*> objectsCopy;
