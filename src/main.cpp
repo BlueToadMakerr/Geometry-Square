@@ -140,7 +140,6 @@ static void drawGameObjectOverlays(PlayLayer* layer) {
 class $modify(PlayLayerOverlayHook, PlayLayer) {
 public:
     void updateOverlays(float dt) {
-        log::info("updateOverlays tick");
         drawGameObjectOverlays(this);
     }
 
