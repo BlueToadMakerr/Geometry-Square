@@ -137,7 +137,7 @@ static void drawGameObjectOverlays(PlayLayer* layer) {
         unsigned char b = ((int)(cpos.x * 23 + cpos.y * 41)) % 256;
 
         // Match transparency (scale object opacity 0–255 → 0–1)
-        float alpha = (opacity / 255.0f) * 0.4f; // 0.4f base overlay intensity
+        float alpha = (opacity / 255.0f);
 
         ccColor4F color = { r / 255.0f, g / 255.0f, b / 255.0f, alpha };
 
