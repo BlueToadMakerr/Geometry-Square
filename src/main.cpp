@@ -110,6 +110,7 @@ static void drawGameObjectOverlays(PlayLayer* layer) {
         if (!obj->getParent()) continue; // skip if removed
 
         auto pos = obj->getPosition();
+
         // Get the camera's position and offset the object by that
         auto parent = obj->getParent();
         while (parent && parent != layer) {
@@ -125,11 +126,19 @@ static void drawGameObjectOverlays(PlayLayer* layer) {
         CCPoint origin(pos.x - (size.width * sx) / 2, pos.y - (size.height * sy) / 2);
         CCPoint dest(pos.x + (size.width * sx) / 2, pos.y + (size.height * sy) / 2);
 
+        // Use the object's texture name (or pointer) as seed
+        std::hash<std::string> hasher;
+        auto tex = obj->getSprite()->getTexture(); // or getTexture()->getName() if available
+        size_t seed = tex ? (size_t)tex : (size_t)obj; // fallback if no texture name
+
+        std::mt19937 objRng(seed); // deterministic RNG per object
+        std::uniform_real_distribution<float> distF(0.0f, 1.0f);
+
         ccColor4F color = {
-            dist(rng) / 255.0f,
-            dist(rng) / 255.0f,
-            dist(rng) / 255.0f,
-            0.4f // semi-transparent
+            distF(objRng),
+            distF(objRng),
+            distF(objRng),
+            0.4f
         };
 
         CCPoint verts[4] = {
