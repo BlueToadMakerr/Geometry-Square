@@ -29,9 +29,22 @@ static CCTexture2D* makeSolidColor(unsigned char r, unsigned char g, unsigned ch
 
 // Hook all sprites
 class $modify(RandomColorSprite, CCSprite) {
+    // Utility to detect if sprite belongs to a GameObject
+    bool isPartOfGameObject() {
+        auto node = this->getParent();
+        while (node) {
+            if (typeinfo_cast<GameObject*>(node)) return true;
+            node = node->getParent();
+        }
+        return false;
+    }
+
     bool initWithSpriteFrame(CCSpriteFrame* frame) {
         if (!CCSprite::initWithSpriteFrame(frame))
             return false;
+
+        // Skip random texture generation if part of a GameObject
+        if (isPartOfGameObject()) return true;
 
         if (frame && frame->getTexture()) {
             auto tex = frame->getTexture();
@@ -41,13 +54,14 @@ class $modify(RandomColorSprite, CCSprite) {
             auto color = g_textureColors[tex];
             this->setTexture(makeSolidColor(color.r, color.g, color.b));
         }
-
         return true;
     }
 
     bool initWithTexture(CCTexture2D* texture, const CCRect& rect) {
         if (!CCSprite::initWithTexture(texture, rect))
             return false;
+
+        if (isPartOfGameObject()) return true;
 
         if (texture) {
             if (g_textureColors.find(texture) == g_textureColors.end()) {
@@ -56,11 +70,16 @@ class $modify(RandomColorSprite, CCSprite) {
             auto color = g_textureColors[texture];
             this->setTexture(makeSolidColor(color.r, color.g, color.b));
         }
-
         return true;
     }
 
     void setTexture(CCTexture2D* texture) {
+        // Skip recoloring for GameObjects
+        if (isPartOfGameObject()) {
+            CCSprite::setTexture(texture);
+            return;
+        }
+
         if (texture) {
             if (g_textureColors.find(texture) == g_textureColors.end()) {
                 g_textureColors[texture] = { (GLubyte)dist(rng), (GLubyte)dist(rng), (GLubyte)dist(rng), 255 };
